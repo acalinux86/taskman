@@ -14,6 +14,11 @@ const char *priority_as_cstr(Priority p)
     }
 }
 
+void our_sqlite3_version()
+{
+    fprintf(stdout, "Sqlite3 Version: %s.\n", sqlite3_libversion());
+}
+
 const char *query_types_as_cstr(Query_Type t)
 {
     switch (t) {
@@ -29,7 +34,7 @@ const char *query_types_as_cstr(Query_Type t)
     }
 }
 
-Query_Type map_query_to_cstr(const char *type_as_cstr)
+Query_Type query_type_from_cstr(const char *type_as_cstr)
 {
     int i;
     for (i = 0; i < QUERY_TYPE_COUNT; ++i) {
@@ -37,11 +42,6 @@ Query_Type map_query_to_cstr(const char *type_as_cstr)
     }
 
     return (Query_Type)i;
-}
-
-void our_sqlite3_version()
-{
-    fprintf(stdout, "Sqlite3 Version: %s.\n", sqlite3_libversion());
 }
 
 char *query_task(Query *query, const char *table, unsigned int *ID, const Task *task, Priority *priority)

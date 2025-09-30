@@ -68,7 +68,8 @@ typedef struct {
 } Query;
 
 void our_sqlite3_version();
-Query_Type map_query_to_cstr(const char *type_as_cstr);
+const char *query_types_as_cstr(Query_Type t);
+Query_Type query_type_from_cstr(const char *type_as_cstr);
 char *query_task(Query *query, const char *table, unsigned int *ID, const Task *task, Priority *priority);
 
 // strdup implementation
