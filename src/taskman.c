@@ -1,5 +1,6 @@
 #include <sqlite3.h>
-#include "task.h"
+
+#include "tm.h"
 
 const char *shift_args(int *argc, char ***argv)
 {
@@ -51,7 +52,7 @@ bool parse_cmd(const char *program, int *argc, char ***argv)
     while (*argc > 0) {
         const char *current_flag = shift_args(argc, argv);
         if (strcmp(current_flag, "--version") == 0 || strcmp(current_flag, "-v") == 0) {
-            our_sqlite3_version();
+            tm_sqlite3_version();
         } else if (strcmp(current_flag, "--task") == 0) {
             if (*argc > 0) {
                 const char *message = shift_args(argc, argv);
@@ -60,7 +61,7 @@ bool parse_cmd(const char *program, int *argc, char ***argv)
                     fprintf(stderr, "\nERROR: NO Task Provided after `%s` flag.\n",current_flag);
                     return false;
                 } else {
-                    printf("TASK: %s\n", message);
+                    printf("TASK: %s ", message);
                 }
                 if (*argc > 0) {
                     const char *priority = shift_args(argc, argv);
@@ -70,7 +71,7 @@ bool parse_cmd(const char *program, int *argc, char ***argv)
                             int number;
                             if (parse_integer(priority_level, &number)) {
                                 if (number < 3 && number >= 0) {
-                                    printf("PRIORITY: %s\n", priority_as_cstr(number));
+                                    printf("PRIORITY: %s\n", tm_priority_as_cstr(number));
                                 } else {
                                     usage(program);
                                     fprintf(stderr, "\nERROR: UnKnown Priority Level `%d` Provided.\n", number);
