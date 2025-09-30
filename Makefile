@@ -11,7 +11,7 @@ all: build/taskman
 build:
 	mkdir -p build
 
-build/taskman: src/task.c src/taskman.c | build
+build/taskman: src/tm.c src/taskman.c | build
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 
 clean:
