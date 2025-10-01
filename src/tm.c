@@ -19,7 +19,6 @@ TM_Priority tm_priority_from_cstr(const char *p_cstr)
     for (i = 0; i < TM_PRIORITY_COUNT; ++i) {
         if (strcmp(tm_priority_as_cstr(i), p_cstr) == 0) break;
     }
-
     return (TM_Priority)i;
 }
 
@@ -49,11 +48,18 @@ TM_QueryType tm_query_type_from_cstr(const char *type_as_cstr)
     for (i = 0; i < TM_QUERY_COUNT; ++i) {
         if (strcmp(tm_query_types_as_cstr(i), type_as_cstr) == 0) break;
     }
-
     return (TM_QueryType)i;
 }
 
-void tm_db_begin(void) {}
+void tm_db_begin(const char *db_path, sqlite3 *db)
+{
+    int result = sqlite3_open(db_path, &db);
+    if (result != SQLITE_OK) {
+        fprintf(stdout, "[ERROR] Failed to Open a Sqlite3 Connection: %s\n", sqlite3_errmsg(db));
+    } else {
+        fprintf(stdout, "[INFO] Successfully Opened a Sqlite3 Connection: %p\n", (void*)db);
+    }
+}
 
 char *tm_query_task(TM_Query *query, const char *table, unsigned int *ID, const TM_Task *task, TM_Priority *priority)
 {
@@ -110,4 +116,8 @@ char *tm_query_task(TM_Query *query, const char *table, unsigned int *ID, const 
 }
 
 
-void tm_db_end(void) {}
+void tm_db_end(sqlite3 *db)
+{
+    sqlite3_close(db);
+    fprintf(stdout, "[INFO] Successfully Closed a Sqlite3 Connection: %p\n", (void*)db);
+}

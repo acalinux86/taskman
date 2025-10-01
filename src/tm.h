@@ -76,9 +76,9 @@ void tm_sqlite3_version(void);
 const char *tm_query_types_as_cstr(TM_QueryType t);
 TM_QueryType tm_query_type_from_cstr(const char *type_as_cstr);
 
-void tm_db_begin(void);
+void tm_db_begin(const char *db_path, sqlite3 *db);
 char *tm_db_query_task(TM_Query *query, const char *table, unsigned int *ID, const TM_Task *task, TM_Priority *priority);
-void tm_db_end(void);
+void tm_db_end(sqlite3 *db);
 
 // strdup implementation
 static inline char *tm_strdup(const char *src)
