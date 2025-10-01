@@ -125,14 +125,20 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    TM_Tasks tasks = {0};
-    if (!tm_parse_cli(&tasks, program, &argc, &argv)) return 1;
+    sqlite3 *db = NULL;
+    const char *test_db = "test.db";
+    tm_db_begin(test_db, db);
+    {
+        TM_Tasks tasks = {0};
+        if (!tm_parse_cli(&tasks, program, &argc, &argv)) return 1;
 
-    for (uint32_t i = 0; i < tasks.count; ++i) {
-        TM_Task *task = &tasks.items[i];
-        fprintf(stdout, "[INFO] ID: %d, Task: `%s` Priority: `%s` Done: %s.\n", task->id, task->message, tm_priority_as_cstr(task->priority), task->done == 0 ? "false" : "true");
+        for (uint32_t i = 0; i < tasks.count; ++i) {
+            TM_Task *task = &tasks.items[i];
+            fprintf(stdout, "[INFO] ID: %d, Task: `%s` Priority: `%s` Done: %s.\n", task->id, task->message, tm_priority_as_cstr(task->priority), task->done == 0 ? "false" : "true");
+        }
+
+        array_delete(&tasks);
     }
-
-    array_delete(&tasks);
+    tm_db_end(db);
     return 0;
 }
