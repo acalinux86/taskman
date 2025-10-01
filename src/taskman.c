@@ -2,7 +2,7 @@
 
 #include "tm.h"
 
-const char *shift_args(int *argc, char ***argv)
+const char *tm_shift_args(int *argc, char ***argv)
 {
     const char *result = **argv;
     (*argc)--;
@@ -10,7 +10,7 @@ const char *shift_args(int *argc, char ***argv)
     return result;
 }
 
-void usage(const char *program)
+void tm_usage(const char *program)
 {
     FILE *out = stderr;
     fprintf(out, "\nTask Manager - Manage priority-based tasks\n\n");
@@ -27,7 +27,7 @@ void usage(const char *program)
     fprintf(out, "  %s --task \"Buy groceries\" --priority 1\n\n", program);
 }
 
-bool parse_integer(const char *cstr_i, int *number)
+bool tm_parse_integer(const char *cstr_i, int *number)
 {
     char *endptr, *str;
     int base = 10; // parse decimal
@@ -47,41 +47,45 @@ bool parse_integer(const char *cstr_i, int *number)
     return true;
 }
 
-bool parse_cmd(const char *program, int *argc, char ***argv)
+bool tm_parse_cli(TM_Tasks *tasks, const char *program, int *argc, char ***argv)
 {
     while (*argc > 0) {
-        const char *current_flag = shift_args(argc, argv);
+        const char *current_flag = tm_shift_args(argc, argv);
         if (strcmp(current_flag, "--version") == 0 || strcmp(current_flag, "-v") == 0) {
             tm_sqlite3_version();
-        } else if (strcmp(current_flag, "--task") == 0) {
+        } else if (strcmp(current_flag, "--task") == 0 || strcmp(current_flag, "-t") == 0) {
+            // When we see the task flag,  we r starting a new task
+            TM_Task task = {0};
             if (*argc > 0) {
-                const char *message = shift_args(argc, argv);
+                const char *message = tm_shift_args(argc, argv);
                 if (strcmp(message, "--priority") == 0 || strcmp(message, "--p") == 0) {
-                    usage(program);
+                    tm_usage(program);
                     fprintf(stderr, "\nERROR: NO Task Provided after `%s` flag.\n",current_flag);
                     return false;
                 } else {
-                    printf("TASK: %s ", message);
+                    task.message = (char*)message;//tm_strdup((char*) message); // register task message
                 }
                 if (*argc > 0) {
-                    const char *priority = shift_args(argc, argv);
-                    if (strcmp(priority, "--priority") == 0 || strcmp(priority, "--p") == 0) {
+                    const char *priority = tm_shift_args(argc, argv);
+                    if (strcmp(priority, "--priority") == 0 || strcmp(priority, "-p") == 0) {
                         if (*argc > 0) {
-                            const char *priority_level = shift_args(argc, argv);
+                            const char *priority_level = tm_shift_args(argc, argv);
                             int number;
-                            if (parse_integer(priority_level, &number)) {
+                            bool is_number = tm_parse_integer(priority_level, &number);
+                            if (is_number) {
                                 if (number < 3 && number >= 0) {
-                                    printf("PRIORITY: %s\n", tm_priority_as_cstr(number));
+                                    task.priority = number; // register priority if given as integer
                                 } else {
-                                    usage(program);
+                                    tm_usage(program);
                                     fprintf(stderr, "\nERROR: UnKnown Priority Level `%d` Provided.\n", number);
                                     return false;
                                 }
                             } else {
-                                printf("PRIORITY: %s\n", priority_level);
+                                // if its not a number then its string
+                                task.priority = tm_priority_from_cstr(priority_level); // register priority if given as string
                             }
                         } else {
-                            usage(program);
+                            tm_usage(program);
                             fprintf(stderr, "\nERROR: No Priority Level Provided.\n");
                             return false;
                         }
@@ -91,15 +95,17 @@ bool parse_cmd(const char *program, int *argc, char ***argv)
                     fprintf(stderr, "\nWARN: No Priority Provided for task `%s`. Defaulting to LOW priority\n", message);
 
                     // TODO: Add Additional Args in Future
-                    return true; // Finished parsing , got task and priority return early for now,
+                    array_append(tasks, task);
+                    // incase of more than one task dont return early // return true; // Finished parsing , got task and priority return early for now,
                 }
             } else {
-                usage(program);
+                tm_usage(program);
                 fprintf(stderr, "\nERROR: No Task Provided.\n");
                 return false;
             }
+            array_append(tasks, task); // Append and continue parsing
         } else {
-            usage(program);
+            tm_usage(program);
             if (strcmp(current_flag, "--priority") == 0 || strcmp(current_flag, "--p") == 0) {
                 fprintf(stderr, "ERROR: Provide task to set the Priority.\n");
             } else {
@@ -113,14 +119,26 @@ bool parse_cmd(const char *program, int *argc, char ***argv)
 
 int main(int argc, char **argv)
 {
-    const char *program = shift_args(&argc, &argv);
+    const char *program = tm_shift_args(&argc, &argv);
     if (argc == 0) {
-        usage(program);
+        tm_usage(program);
         return 1;
     }
-    if (!parse_cmd(program, &argc, &argv)) return 1;
+
+    sqlite3 *db = NULL;
+    const char *test_db = "test.db";
+    tm_db_begin(test_db, db);
+    {
+        TM_Tasks tasks = {0};
+        if (!tm_parse_cli(&tasks, program, &argc, &argv)) return 1;
+
+        for (uint32_t i = 0; i < tasks.count; ++i) {
+            TM_Task *task = &tasks.items[i];
+            fprintf(stdout, "[INFO] ID: %d, Task: `%s` Priority: `%s` Done: %s.\n", task->id, task->message, tm_priority_as_cstr(task->priority), task->done == 0 ? "false" : "true");
+        }
+
+        array_delete(&tasks);
+    }
+    tm_db_end(db);
     return 0;
 }
-
-
-// TODO: `tm` namespacing
