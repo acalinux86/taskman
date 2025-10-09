@@ -1,6 +1,11 @@
 #include <sqlite3.h>
 
-#include "tm.h"
+#include "./tm.h"
+#include "./array.h"
+
+typedef ARRAY(char *) TM_String;
+
+static const char *table = "Tasks";
 
 const char *tm_shift_args(int *argc, char ***argv)
 {
@@ -19,15 +24,16 @@ void tm_usage(const char *program)
     fprintf(out, "  --task <message>    Specify task description (required)\n");
     fprintf(out, "  --priority <value>  Set task priority (required)\n");
     fprintf(out, "                      Values: 0|LOW, 1|MEDIUM, 2|HIGH\n");
-    fprintf(out, "  --list, -l         List the Available Tasks\n");
-    fprintf(out, "  --version, -v      Print out the database details\n");
-    fprintf(out, "  --help, -h         Show this help message\n\n");
+    fprintf(out, "  --delete <id>       Specify task id to be deleted (required)\n");
+    fprintf(out, "  --list, -l          List the Available Tasks\n");
+    fprintf(out, "  --version, -v       Print out the database details\n");
+    fprintf(out, "  --help, -h          Show this help message\n\n");
     fprintf(out, "EXAMPLES:\n");
     fprintf(out, "  %s --task \"Finish project\" --priority HIGH\n", program);
     fprintf(out, "  %s --task \"Buy groceries\" --priority 1\n\n", program);
 }
 
-bool tm_parse_integer(const char *cstr_i, int *number)
+static bool tm_parse_integer(const char *cstr_i, int *number)
 {
     char *endptr, *str;
     int base = 10; // parse decimal
@@ -47,12 +53,68 @@ bool tm_parse_integer(const char *cstr_i, int *number)
     return true;
 }
 
-bool tm_parse_cli(TM_Tasks *tasks, const char *program, int *argc, char ***argv)
+static int callback(void *not_used, int argc, char **argv, char **az_colname) {
+    (void) not_used;
+    int i;
+    for(i = 0; i<argc; i++) {
+        printf("%s = %s\n", az_colname[i], argv[i] ? argv[i] : "NULL");
+    }
+    printf("\n");
+    return 0;
+}
+
+// TODO: Query the resulted buffer
+static char *tm_db_list_tasks()
+{
+    TM_QueryType query = TM_SELECT_ALL;
+    char *buffer = tm_db_query_task(query, table, NULL, NULL, NULL);
+    assert(buffer != NULL);
+    return buffer;
+}
+
+static char *tm_db_insert_task(const TM_Task *task)
+{
+    TM_QueryType query = TM_INSERT;
+    char *buffer = tm_db_query_task(query, table, NULL, task, NULL);
+    assert(buffer != NULL);
+    return buffer;
+}
+
+static char *tm_db_create_table()
+{
+    TM_QueryType query = TM_CREATE_TABLE;
+    char *buffer = tm_db_query_task(query, table, NULL, NULL, NULL);
+    assert(buffer != NULL);
+    return buffer;
+}
+
+static char *tm_db_delete_task(const int *id)
+{
+    TM_QueryType query = TM_DELETE_ONE;
+    char *buffer = tm_db_query_task(query, table, id, NULL, NULL);
+    assert(buffer != NULL);
+    return buffer;
+}
+
+static bool tm_parse_cli(TM_Tasks *tasks, TM_String *buffers, const char *program, int *argc, char ***argv)
 {
     while (*argc > 0) {
         const char *current_flag = tm_shift_args(argc, argv);
         if (strcmp(current_flag, "--version") == 0 || strcmp(current_flag, "-v") == 0) {
             tm_sqlite3_version();
+        } else if (strcmp(current_flag, "--list") == 0 || strcmp(current_flag, "-l") == 0) {
+            char *query = tm_strdup((char*)tm_db_list_tasks());
+            array_append(buffers, query);
+        } else if (strcmp(current_flag, "--delete") == 0 || strcmp(current_flag, "-d") == 0) {
+            if (*argc > 0) {
+                const int id = atoi((char*)tm_shift_args(argc, argv));
+                char *query = tm_db_delete_task(&id);
+                array_append(buffers, query);
+            } else {
+                tm_usage(program);
+                fprintf(stderr, "\nERROR: Cannot delete task, No id provided after `%s` flag.\n", current_flag);
+                return false;
+            }
         } else if (strcmp(current_flag, "--task") == 0 || strcmp(current_flag, "-t") == 0) {
             // When we see the task flag,  we r starting a new task
             TM_Task task = {0};
@@ -117,28 +179,105 @@ bool tm_parse_cli(TM_Tasks *tasks, const char *program, int *argc, char ***argv)
     return true;
 }
 
+static bool tm_db_register_tasks(const TM_Tasks *tasks, TM_String *string)
+{
+    if (!tasks || tasks->count == 0) return false;
+    for (uint32_t i = 0; i < tasks->count; ++i) {
+        char *str =  (char*)tm_db_insert_task(&tasks->items[i]);
+        array_append(string, str);
+        free(&tasks->items[i].message);
+    }
+    return true;
+}
+
+void tm_debug_tasks(const TM_Tasks *tasks)
+{
+    for (uint32_t i = 0; i < tasks->count; ++i) {
+        TM_Task *task = &tasks->items[i];
+        fprintf(stdout, "[INFO] ID: %d, Task: `%s` Priority: `%s` Done: %s.\n", task->id, task->message, tm_priority_as_cstr(task->priority), task->done == 0 ? "false" : "true");
+    }
+}
+
+bool tm_db_execute_query(const char *query_buf)
+{
+    char *err_msg = NULL;
+    int result = sqlite3_exec(db, query_buf, callback, 0, &err_msg);
+    if (result != SQLITE_OK) {
+        if (err_msg) {
+            fprintf(stderr, "[ERROR] %s\n", err_msg);
+            sqlite3_free(err_msg);
+        } else {
+            fprintf(stderr, "[ERROR] Unknown SQL Error\n");
+        }
+        return false;
+    } else {
+        fprintf(stdout, "[INFO] Successfully Queried\n");
+    }
+    return true;
+}
+
 int main(int argc, char **argv)
 {
+    int result = 0;
+    static const char *test_db = "test.db";
+    tm_db_begin(test_db);
+
     const char *program = tm_shift_args(&argc, &argv);
     if (argc == 0) {
         tm_usage(program);
-        return 1;
+        result = 1;
+        goto defer;
     }
 
-    sqlite3 *db = NULL;
-    const char *test_db = "test.db";
-    tm_db_begin(test_db, db);
-    {
-        TM_Tasks tasks = {0};
-        if (!tm_parse_cli(&tasks, program, &argc, &argv)) return 1;
+    TM_Tasks tasks = {0};
+    TM_String bufs = {0};
+    if (!tm_parse_cli(&tasks, &bufs, program, &argc, &argv)) {
+        result = 1;
+        goto defer;
+    }
 
-        for (uint32_t i = 0; i < tasks.count; ++i) {
-            TM_Task *task = &tasks.items[i];
-            fprintf(stdout, "[INFO] ID: %d, Task: `%s` Priority: `%s` Done: %s.\n", task->id, task->message, tm_priority_as_cstr(task->priority), task->done == 0 ? "false" : "true");
+    char *create = tm_db_create_table();
+    if (!tm_db_execute_query(create)) {
+        result = 1;
+        goto defer;
+    }
+
+    TM_String str = {0};
+    if (tasks.count > 0) {
+        if (!tm_db_register_tasks(&tasks, &str)) {
+            result = 1;
+            goto defer;
         }
-
-        array_delete(&tasks);
+        for (uint32_t i = 0; i < str.count; ++i) {
+            if(!tm_db_execute_query(str.items[i])) {
+                free(str.items[i]);
+                result = 1;
+                goto defer;
+            } else {
+                free(str.items[i]);
+            }
+        }
     }
-    tm_db_end(db);
-    return 0;
+
+    if (bufs.count > 0) {
+        for (size_t i = 0; i < bufs.count; ++i) {
+            char *buf = bufs.items[i];
+            if (buf && tm_db_execute_query(buf)) {
+                free(buf);
+            } else {
+                free(buf);
+                result = 1;
+                goto defer;
+            }
+        }
+    }
+
+    result = 0; goto defer; // on success
+defer:
+    if (create) free(create);
+    if (db) tm_db_end(db); // close sqlite3 coonection
+    if (bufs.count > 0 && bufs.items) array_delete(&bufs); // free
+    if (tasks.count > 0 && tasks.items) array_delete(&tasks); // free
+    if (str.count > 0 && str.items) array_delete(&str); // free
+    return result;
 }
