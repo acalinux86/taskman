@@ -281,3 +281,5 @@ defer:
     if (str.count > 0 && str.items) array_delete(&str); // free
     return result;
 }
+
+// TODO: Add Support for marking tasks as done
