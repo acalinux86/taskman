@@ -15,4 +15,4 @@ build/taskman: src/tm.c src/taskman.c | build
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 
 clean:
-	rm -rf build/
+	rm -rf build/ test.db
