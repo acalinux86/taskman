@@ -185,7 +185,6 @@ static bool tm_db_register_tasks(const TM_Tasks *tasks, TM_String *string)
     for (uint32_t i = 0; i < tasks->count; ++i) {
         char *str =  (char*)tm_db_insert_task(&tasks->items[i]);
         array_append(string, str);
-        free(&tasks->items[i].message);
     }
     return true;
 }
@@ -281,3 +280,5 @@ defer:
     if (str.count > 0 && str.items) array_delete(&str); // free
     return result;
 }
+
+// TODO: Add Support for marking tasks as done
