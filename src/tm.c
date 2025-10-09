@@ -1,6 +1,8 @@
 #include <sqlite3.h>
 #include "tm.h"
 
+sqlite3 *db = NULL;
+
 const char *tm_priority_as_cstr(TM_Priority p)
 {
     switch (p) {
@@ -51,36 +53,34 @@ TM_QueryType tm_query_type_from_cstr(const char *type_as_cstr)
     return (TM_QueryType)i;
 }
 
-void tm_db_begin(const char *db_path, sqlite3 *db)
+void tm_db_begin(const char *db_path)
 {
     int result = sqlite3_open(db_path, &db);
     if (result != SQLITE_OK) {
-        fprintf(stdout, "[ERROR] Failed to Open a Sqlite3 Connection: %s\n", sqlite3_errmsg(db));
+        fprintf(stderr, "[ERROR] Failed to Open a Sqlite3 Connection: %s\n", sqlite3_errmsg(db));
     } else {
         fprintf(stdout, "[INFO] Successfully Opened a Sqlite3 Connection: %p\n", (void*)db);
     }
 }
 
-char *tm_query_task(TM_Query *query, const char *table, unsigned int *ID, const TM_Task *task, TM_Priority *priority)
+char *tm_db_query_task(TM_QueryType type, const char *table, const int *ID, const TM_Task *task, TM_Priority *priority)
 {
     char buffer[TM_BUFFER_LEN];
-    switch(query->type) {
+    switch(type) {
+    case TM_CREATE_TABLE: {
+        snprintf(buffer, sizeof(buffer), "CREATE TABLE IF NOT EXISTS %s(Id INTEGER PRIMARY KEY AUTOINCREMENT, Task TEXT NOT NULL, Priority TEXT NOT NULL, Done TEXT NOT NULL);", table);
+    } break;
+
     case TM_SELECT_ALL: {
         snprintf(buffer, sizeof(buffer), "SELECT * FROM %s;", table);
-        query->statement = (TM_QueryData *)malloc(sizeof(TM_QueryData));
-        query->statement->select_all_rows = tm_strdup(buffer);
     } break;
 
     case TM_SELECT_ONE: {
         snprintf(buffer, sizeof(buffer), "SELECT Id, Task, Priority FROM %s WHERE Id = %d;", table, *ID);
-        query->statement = (TM_QueryData *)malloc(sizeof(TM_QueryData));
-        query->statement->select_row = tm_strdup(buffer);
     } break;
 
     case TM_DELETE_ALL: {
         snprintf(buffer, sizeof(buffer), "DROP FROM %s;", table);
-        query->statement = (TM_QueryData *)malloc(sizeof(TM_QueryData));
-        query->statement->delete_all_rows = tm_strdup(buffer);
     } break;
 
     case TM_DELETE_ONE: {
@@ -89,8 +89,6 @@ char *tm_query_task(TM_Query *query, const char *table, unsigned int *ID, const 
         } else if (ID != NULL) {
             snprintf(buffer, sizeof(buffer), "DELETE FROM %s WHERE Id = %d;", table, *ID);
         }
-        query->statement = (TM_QueryData *)malloc(sizeof(TM_QueryData));
-        query->statement->delete_all_rows = tm_strdup(buffer);
     } break;
 
     case TM_INSERT: {
@@ -103,21 +101,23 @@ char *tm_query_task(TM_Query *query, const char *table, unsigned int *ID, const 
 
     case TM_UPDATE: {
         snprintf(buffer, sizeof(buffer), "UPDATE %s SET Done = 'true' WHERE Id = %d;", table, *ID);
-        query->statement = (TM_QueryData *)malloc(sizeof(TM_QueryData));
-        query->statement->update_row = tm_strdup(buffer);
     } break;
 
     default:
         fprintf(stderr, "ERROR: UnKnown Type.\n");
         return NULL;
     }
-
     return tm_strdup(buffer);
 }
 
 
-void tm_db_end(sqlite3 *db)
+void tm_db_end()
 {
-    sqlite3_close(db);
-    fprintf(stdout, "[INFO] Successfully Closed a Sqlite3 Connection: %p\n", (void*)db);
+    int result = sqlite3_close(db);
+    assert(result != SQLITE_BUSY);
+    if (result != SQLITE_OK) {
+        fprintf(stderr, "[ERROR] Failed to Close Sqlite3 Connection: %s\n", sqlite3_errmsg(db));
+    } else {
+        fprintf(stdout, "[INFO] Successfully Closed a Sqlite3 Connection: %p\n", (void*)db);
+    }
 }

@@ -29,7 +29,7 @@ TM_Priority tm_priority_from_cstr(const char *p_cstr);
 
 typedef struct _tm_task {
     char *message;
-    unsigned int id;
+    int id;
     TM_Priority priority;
     bool done;
 } TM_Task;
@@ -38,7 +38,8 @@ typedef ARRAY(TM_Task) TM_Tasks; // Incase the user provides more than 1 task th
 
 // Database Functions
 typedef enum _tm_query_type {
-    TM_SELECT_ALL = 0,
+    TM_CREATE_TABLE,
+    TM_SELECT_ALL,
     TM_SELECT_ONE,
 
     TM_DELETE_ALL,
@@ -50,35 +51,16 @@ typedef enum _tm_query_type {
     TM_QUERY_COUNT,
 } TM_QueryType;
 
-typedef union _tm_query_data {
-    // Querying Database
-    char *select_all_rows;
-    char *select_row;
-
-    // Deleting Specific Row
-    char *delete_row;
-    char *delete_all_rows;
-
-    // Inserting Data
-    char *insert_row;
-
-    // Updating A Row
-    char *update_row;
-} TM_QueryData;
-
-typedef struct _tm_query {
-    TM_QueryType type;
-    TM_QueryData *statement;
-} TM_Query;
-
 void tm_sqlite3_version(void);
 
 const char *tm_query_types_as_cstr(TM_QueryType t);
 TM_QueryType tm_query_type_from_cstr(const char *type_as_cstr);
 
-void tm_db_begin(const char *db_path, sqlite3 *db);
-char *tm_db_query_task(TM_Query *query, const char *table, unsigned int *ID, const TM_Task *task, TM_Priority *priority);
-void tm_db_end(sqlite3 *db);
+void tm_db_begin(const char *db_path);
+char *tm_db_query_task(TM_QueryType type, const char *table, const int *ID, const TM_Task *task, TM_Priority *priority);
+void tm_db_end();
+
+extern sqlite3 *db;
 
 // strdup implementation
 static inline char *tm_strdup(const char *src)
