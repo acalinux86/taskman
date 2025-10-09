@@ -64,11 +64,12 @@
 #define array_append(array, item) array_push((array), item, (array)->count)
 
 // NOTE: Destroy the Array
-#define array_delete(array)    \
-    do {                       \
-        free((array)->items);  \
-        (array)->count = 0;    \
-        (array)->capacity = 0; \
+#define array_delete(array)                     \
+    do {                                        \
+        free((array)->items);                   \
+        (array)->count = 0;                     \
+        (array)->capacity = 0;                  \
+        (array)->items = NULL;                  \
     } while(0)
 
 // NOTE: Output the Array x-tics
