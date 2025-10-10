@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <sqlite3.h>
 
 #include "./tm.h"
@@ -21,16 +22,18 @@ void tm_usage(const char *program)
     fprintf(out, "\nTask Manager - Manage priority-based tasks\n\n");
     fprintf(out, "USAGE: %s [OPTIONS]\n\n", program);
     fprintf(out, "OPTIONS:\n");
-    fprintf(out, "  --task <message>    Specify task description (required)\n");
-    fprintf(out, "  --priority <value>  Set task priority (required)\n");
-    fprintf(out, "                      Values: 0|LOW, 1|MEDIUM, 2|HIGH\n");
-    fprintf(out, "  --delete <id>       Specify task id to be deleted (required)\n");
-    fprintf(out, "  --list, -l          List the Available Tasks\n");
-    fprintf(out, "  --version, -v       Print out the database details\n");
-    fprintf(out, "  --help, -h          Show this help message\n\n");
+    fprintf(out, "  --task, -t <message>    Specify task description (required)\n");
+    fprintf(out, "  --priority, -p <value>  Set task priority (required)\n");
+    fprintf(out, "                          Values: 0|LOW, 1|MEDIUM, 2|HIGH\n");
+    fprintf(out, "  --delete, -d <id>       Specify task id to be deleted (required)\n");
+    fprintf(out, "  --finish, -f <id>       Specify task id to be marked done (required)\n");
+    fprintf(out, "  --list, -l              List the Available Tasks\n");
+    fprintf(out, "  --version, -v           Print out the database details\n");
+    fprintf(out, "  --help, -h              Show this help message\n\n");
     fprintf(out, "EXAMPLES:\n");
     fprintf(out, "  %s --task \"Finish project\" --priority HIGH\n", program);
-    fprintf(out, "  %s --task \"Buy groceries\" --priority 1\n\n", program);
+    fprintf(out, "  %s --delete 1 \n", program);
+    fprintf(out, "  %s --finish 1 \n", program);
 }
 
 static bool tm_parse_integer(const char *cstr_i, int *number)
@@ -96,6 +99,14 @@ static char *tm_db_delete_task(const int *id)
     return buffer;
 }
 
+static char *tm_db_update_task(const int *id)
+{
+    TM_QueryType query = TM_UPDATE;
+    char *buffer = tm_db_query_task(query, table, id, NULL, NULL);
+    assert(buffer != NULL);
+    return buffer;
+}
+
 static bool tm_parse_cli(TM_Tasks *tasks, TM_String *buffers, const char *program, int *argc, char ***argv)
 {
     while (*argc > 0) {
@@ -113,6 +124,16 @@ static bool tm_parse_cli(TM_Tasks *tasks, TM_String *buffers, const char *progra
             } else {
                 tm_usage(program);
                 fprintf(stderr, "\nERROR: Cannot delete task, No id provided after `%s` flag.\n", current_flag);
+                return false;
+            }
+        } else if (strcmp(current_flag, "--finish") == 0 || strcmp(current_flag, "-f") == 0) {
+            if (*argc > 0) {
+                const int id = atoi((char*)tm_shift_args(argc, argv));
+                char *query = tm_db_update_task(&id);
+                array_append(buffers, query);
+            } else {
+                tm_usage(program);
+                fprintf(stderr, "\nERROR: Cannot update task, No id provided after `%s` flag.\n", current_flag);
                 return false;
             }
         } else if (strcmp(current_flag, "--task") == 0 || strcmp(current_flag, "-t") == 0) {
@@ -237,9 +258,11 @@ int main(int argc, char **argv)
 
     char *create = tm_db_create_table();
     if (!tm_db_execute_query(create)) {
+        free(create);
         result = 1;
         goto defer;
     }
+    free(create);
 
     TM_String str = {0};
     if (tasks.count > 0) {
@@ -273,7 +296,6 @@ int main(int argc, char **argv)
 
     result = 0; goto defer; // on success
 defer:
-    if (create) free(create);
     if (db) tm_db_end(db); // close sqlite3 coonection
     if (bufs.count > 0 && bufs.items) array_delete(&bufs); // free
     if (tasks.count > 0 && tasks.items) array_delete(&tasks); // free
