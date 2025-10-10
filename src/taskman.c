@@ -66,7 +66,6 @@ static int callback(void *not_used, int argc, char **argv, char **az_colname) {
     return 0;
 }
 
-// TODO: Query the resulted buffer
 static char *tm_db_list_tasks()
 {
     TM_QueryType query = TM_SELECT_ALL;
@@ -174,10 +173,7 @@ static bool tm_parse_cli(TM_Tasks *tasks, TM_String *buffers, const char *progra
                         }
                     }
                 } else {
-                    // TODO: Consider Giving the id instead of message in Future
                     fprintf(stderr, "\nWARN: No Priority Provided for task `%s`. Defaulting to LOW priority\n", message);
-
-                    // TODO: Add Additional Args in Future
                     array_append(tasks, task);
                     // incase of more than one task dont return early // return true; // Finished parsing , got task and priority return early for now,
                 }
@@ -303,4 +299,4 @@ defer:
     return result;
 }
 
-// TODO: Add Support for marking tasks as done
+// TODO: Refactor code
