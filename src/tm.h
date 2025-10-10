@@ -1,15 +1,13 @@
 #ifndef TM_H_
 #define TM_H_
 
-#include <stdio.h>
-#include <stddef.h>
-#include <string.h>
-#include <ctype.h>
-#include <stdlib.h>
 #include <assert.h>
+#include <ctype.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "./array.h"
 
@@ -17,7 +15,7 @@
 #define TM_BUFFER_LEN   1024
 #define TM_PRIORITY_LEN 10
 
-typedef enum _tm_priority {
+typedef enum tm_priority {
     TM_LOW,
     TM_MEDIUM,
     TM_HIGH,
@@ -27,7 +25,7 @@ typedef enum _tm_priority {
 const char *tm_priority_as_cstr(TM_Priority p);
 TM_Priority tm_priority_from_cstr(const char *p_cstr);
 
-typedef struct _tm_task {
+typedef struct tm_task {
     char *message;
     int id;
     TM_Priority priority;
@@ -37,7 +35,7 @@ typedef struct _tm_task {
 typedef ARRAY(TM_Task) TM_Tasks; // Incase the user provides more than 1 task through cli
 
 // Database Functions
-typedef enum _tm_query_type {
+typedef enum tm_query_type {
     TM_CREATE_TABLE,
     TM_SELECT_ALL,
     TM_SELECT_ONE,
