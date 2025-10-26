@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+#include <sqlite3.h>
 
 #include "./array.h"
 
@@ -49,6 +51,8 @@ typedef enum tm_query_type {
     TM_QUERY_COUNT,
 } TM_QueryType;
 
+typedef ARRAY(char *) TM_String;
+
 void tm_sqlite3_version(void);
 
 const char *tm_query_types_as_cstr(TM_QueryType t);
@@ -57,6 +61,15 @@ TM_QueryType tm_query_type_from_cstr(const char *type_as_cstr);
 void tm_db_begin(const char *db_path);
 char *tm_db_query_task(TM_QueryType type, const char *table, const int *ID, const TM_Task *task, TM_Priority *priority);
 void tm_db_end();
+
+bool tm_parse_cli(TM_Tasks *tasks, TM_String *buffers, const char *program, int *argc, char ***argv);
+bool tm_db_register_tasks(const TM_Tasks *tasks, TM_String *string);
+bool tm_db_execute_query(const char *query_buf);
+char *tm_db_create_table();
+void tm_debug_tasks(const TM_Tasks *tasks);
+
+const char *tm_shift_args(int *argc, char ***argv);
+void tm_usage(const char *program);
 
 extern sqlite3 *db;
 
